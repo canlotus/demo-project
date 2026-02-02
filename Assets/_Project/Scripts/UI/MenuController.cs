@@ -51,11 +51,20 @@ public class MenuController : MonoBehaviour
         difficultyDropdown.RefreshShownValue();
     }
 
-    private void RefreshContinueButton()
+private void RefreshContinueButton()
+{
+    if (continueButton == null) return;
+
+    if (!SaveSystem.TryLoad(out var save) || save == null)
     {
-        if (continueButton == null) return;
-        continueButton.interactable = SaveSystem.HasSave();
+        continueButton.interactable = false;
+        return;
     }
+
+    // Save var ama oyun bitmişse Continue kapalı
+    continueButton.interactable = !save.isCompleted;
+}
+
 
     private void OnNewGameClicked()
     {
@@ -78,6 +87,8 @@ public class MenuController : MonoBehaviour
             matches = 0,
             previewDone = false,
             matchedCellIndices = Array.Empty<int>(),
+            isCompleted = false,
+
         };
         SaveSystem.Save(save);
         SceneManager.LoadScene(gameSceneName);
@@ -85,7 +96,13 @@ public class MenuController : MonoBehaviour
 
     private void OnContinueClicked()
     {
-        if (!SaveSystem.HasSave())
+        if (!SaveSystem.TryLoad(out var save) || save == null)
+        {
+            RefreshContinueButton();
+            return;
+        }
+
+        if (save.isCompleted)
         {
             RefreshContinueButton();
             return;

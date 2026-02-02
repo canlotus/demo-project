@@ -13,6 +13,8 @@ public class GameController : MonoBehaviour
     [SerializeField] private DifficultyDatabaseSO difficultyDb;
 
     [Header("UI")]
+
+    [SerializeField] private GameSceneCanvas gameSceneCanvas;
     [SerializeField] private TMP_Text matchCountText;
     [SerializeField] private TMP_Text attemptCountText;
 
@@ -233,7 +235,14 @@ public class GameController : MonoBehaviour
         if (IsGameOver())
         {
             Debug.Log("[GameController] GAME OVER (all matched)");
-            // game over UI/sfx sonra
+
+            _save.isCompleted = true;     // ✅ completed işaretle
+            SaveSystem.Save(_save);       // ✅ kaydet
+
+            _inputLocked = true;          // ✅ input kapat (oyun bitti)
+
+            if (gameSceneCanvas != null)  // ✅ panel aç
+                gameSceneCanvas.ShowGameOver();
         }
     }
 

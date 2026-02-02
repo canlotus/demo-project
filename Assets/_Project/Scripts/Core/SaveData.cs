@@ -16,7 +16,7 @@ public class SaveData
 
     public int attempts;
     public int matches;
-
+    public bool isCompleted;
     public bool previewDone;
 
     // row-major cellIndex list
