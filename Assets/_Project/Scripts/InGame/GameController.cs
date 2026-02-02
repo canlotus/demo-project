@@ -13,7 +13,6 @@ public class GameController : MonoBehaviour
     [SerializeField] private DifficultyDatabaseSO difficultyDb;
 
     [Header("UI")]
-
     [SerializeField] private GameSceneCanvas gameSceneCanvas;
     [SerializeField] private TMP_Text matchCountText;
     [SerializeField] private TMP_Text attemptCountText;
@@ -65,6 +64,12 @@ public class GameController : MonoBehaviour
             if (_save.matchedCellIndices != null)
                 for (int i = 0; i < _save.matchedCellIndices.Length; i++)
                     _matchedCellSet.Add(_save.matchedCellIndices[i]);
+
+            if (_save.isCompleted)
+            {
+                _inputLocked = true;
+                if (gameSceneCanvas != null) gameSceneCanvas.ShowGameOver();
+            }
         }
         else
         {
@@ -82,7 +87,8 @@ public class GameController : MonoBehaviour
                 attempts = 0,
                 matches = 0,
                 previewDone = false,
-                matchedCellIndices = Array.Empty<int>()
+                matchedCellIndices = Array.Empty<int>(),
+                isCompleted = false
             };
 
             _matchedCellSet.Clear();
@@ -104,6 +110,13 @@ public class GameController : MonoBehaviour
             card.Clicked += OnCardClicked;
 
         RefreshUI();
+
+        // Eğer zaten completed ise preview/tıklama akışına girme
+        if (_save.isCompleted)
+        {
+            boardBuilder.ForceAllUnmatchedFaceDownInstant();
+            return;
+        }
 
         if (!_save.previewDone && _entry.previewSeconds > 0f)
             StartCoroutine(PreviewRoutine(_entry.previewSeconds));
@@ -137,6 +150,7 @@ public class GameController : MonoBehaviour
         _inputLocked = true;
 
         yield return new WaitForSecondsRealtime(seconds);
+
         foreach (var card in boardBuilder.SpawnedCards)
         {
             if (card == null) continue;
@@ -154,6 +168,8 @@ public class GameController : MonoBehaviour
     private void OnCardClicked(CardView card)
     {
         if (card == null) return;
+        if (_save != null && _save.isCompleted) return;
+
         if (_previewRunning) return;
         if (_inputLocked) return;
         if (card.IsMatched) return;
@@ -186,6 +202,8 @@ public class GameController : MonoBehaviour
             SaveSystem.Save(_save);
 
             yield return StartCoroutine(ResolvePairRoutine());
+            if (_save != null && _save.isCompleted)
+                yield break;
 
             _inputLocked = false;
         }
@@ -199,6 +217,8 @@ public class GameController : MonoBehaviour
 
         if (isMatch)
         {
+            if (AudioManager.I != null) AudioManager.I.PlayMatch();
+
             _save.matches++;
 
             _matchedCellSet.Add(_first.CellIndex);
@@ -210,12 +230,13 @@ public class GameController : MonoBehaviour
 
             float vanishDur = Mathf.Max(0f, _entry.matchVanishSeconds);
 
-            // ✅ SetActive(false) yerine empty'ye dönüş
             yield return StartCoroutine(_first.VanishToEmpty(vanishDur));
             yield return StartCoroutine(_second.VanishToEmpty(vanishDur));
         }
         else
         {
+            if (AudioManager.I != null) AudioManager.I.PlayMismatch();
+
             float flash = Mathf.Max(0f, _entry.mismatchFlashSeconds);
 
             yield return StartCoroutine(FlashBoth(_first, _second, flash));
@@ -230,13 +251,14 @@ public class GameController : MonoBehaviour
         if (IsGameOver())
         {
             Debug.Log("[GameController] GAME OVER (all matched)");
+            if (AudioManager.I != null) AudioManager.I.PlayWin();
 
-            _save.isCompleted = true;     
-            SaveSystem.Save(_save);     
+            _save.isCompleted = true;
+            SaveSystem.Save(_save);
 
-            _inputLocked = true; 
+            _inputLocked = true;
 
-            if (gameSceneCanvas != null) 
+            if (gameSceneCanvas != null)
                 gameSceneCanvas.ShowGameOver();
         }
     }
