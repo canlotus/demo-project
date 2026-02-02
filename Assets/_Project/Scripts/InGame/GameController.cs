@@ -1,8 +1,13 @@
+using System;
 using UnityEngine;
 
 public class GameController : MonoBehaviour
 {
+    [Header("References")]
     [SerializeField] private BoardBuilder boardBuilder;
+
+    [Header("Config")]
+    [SerializeField] private DifficultyDatabaseSO difficultyDb;
 
     private void Start()
     {
@@ -12,22 +17,43 @@ public class GameController : MonoBehaviour
             return;
         }
 
-        // Continue ise save'den layout al, değilse session'dan
+        if (difficultyDb == null)
+        {
+            Debug.LogError("[GameController] difficultyDb missing! Assign DifficultyDatabase asset in inspector.");
+            return;
+        }
+
+        // Determine layout + seed + difficulty based on StartMode
+        DifficultyId diff;
         BoardLayoutData layout;
         int seed;
 
         if (GameSession.StartMode == StartMode.Continue && SaveSystem.TryLoad(out var save))
         {
-            layout = new BoardLayoutData(save.rows, save.cols, save.emptyIndices ?? System.Array.Empty<int>());
+            diff = save.difficulty;
+            layout = new BoardLayoutData(
+                save.rows,
+                save.cols,
+                save.emptyIndices ?? Array.Empty<int>()
+            );
             seed = save.seed;
         }
         else
         {
+            diff = GameSession.Difficulty;
             layout = GameSession.Layout;
             seed = GameSession.Seed;
         }
 
-        boardBuilder.Build(layout, seed);
+        var entry = difficultyDb.Get(diff);
+        if (entry == null)
+        {
+            Debug.LogError($"[GameController] Difficulty entry not found for {diff}. Check DifficultyDatabase asset.");
+            return;
+        }
+
+        // Build board with sprites from Scriptable
+        boardBuilder.Build(layout, seed, entry.faceSprites);
 
         // Hook card clicks
         foreach (var card in boardBuilder.SpawnedCards)
@@ -35,15 +61,18 @@ public class GameController : MonoBehaviour
             card.Clicked += OnCardClicked;
         }
 
-        Debug.Log($"[GameController] Board built: {layout.rows}x{layout.cols}, empties={layout.emptyIndices?.Length ?? 0}, seed={seed}");
+        int empties = layout.emptyIndices == null ? 0 : layout.emptyIndices.Length;
+        Debug.Log($"[GameController] Board built | mode={GameSession.StartMode} diff={diff} board={layout.rows}x{layout.cols} empties={empties} seed={seed}");
     }
 
     private void OnDestroy()
     {
         if (boardBuilder == null) return;
+
         foreach (var card in boardBuilder.SpawnedCards)
         {
-            if (card != null) card.Clicked -= OnCardClicked;
+            if (card != null)
+                card.Clicked -= OnCardClicked;
         }
     }
 

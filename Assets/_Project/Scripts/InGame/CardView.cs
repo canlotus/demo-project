@@ -9,6 +9,8 @@ public class CardView : MonoBehaviour, IPointerClickHandler
     [Header("UI")]
     [SerializeField] private GameObject frontRoot;
     [SerializeField] private GameObject backRoot;
+
+    [Tooltip("Front yüzün Image component'i (sprite buraya atanacak)")]
     [SerializeField] private Image frontImage;
 
     [Header("Flip")]
@@ -22,17 +24,29 @@ public class CardView : MonoBehaviour, IPointerClickHandler
 
     private bool _isFlipping;
 
+    // ✅ Yeni init: sprite atar
+    public void Init(int cardId, Sprite faceSprite)
+    {
+        CardId = cardId;
+
+        if (frontImage != null)
+            frontImage.sprite = faceSprite;
+
+        SetMatched(false);
+        SetFaceUp(false, instant: true);
+    }
+
+    // (İstersen eski Init'i de bırakabilirsin)
     public void Init(int cardId)
     {
         CardId = cardId;
+        SetMatched(false);
         SetFaceUp(false, instant: true);
-        IsMatched = false;
     }
 
     public void SetMatched(bool matched)
     {
         IsMatched = matched;
-        // matched olunca açık kalsın
         if (matched) SetFaceUp(true, instant: true);
     }
 
@@ -63,13 +77,10 @@ public class CardView : MonoBehaviour, IPointerClickHandler
 
         float half = flipDuration * 0.5f;
 
-        // 1 -> 0
         yield return ScaleX(1f, 0f, half);
 
-        // swap
         SetFaceUp(!IsFaceUp, instant: true);
 
-        // 0 -> 1
         yield return ScaleX(0f, 1f, half);
 
         _isFlipping = false;
@@ -88,6 +99,7 @@ public class CardView : MonoBehaviour, IPointerClickHandler
             transform.localScale = s;
             yield return null;
         }
+
         var s2 = transform.localScale;
         s2.x = to;
         transform.localScale = s2;
