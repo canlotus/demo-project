@@ -126,7 +126,6 @@ public class GameController : MonoBehaviour
         {
             if (boardBuilder.TryGetCardByCellIndex(cellIndex, out var card) && card != null)
             {
-                // ✅ layout bozulmasın diye SetActive(false) yok:
                 card.MakeEmptyInstant();
             }
         }
@@ -138,14 +137,10 @@ public class GameController : MonoBehaviour
         _inputLocked = true;
 
         yield return new WaitForSecondsRealtime(seconds);
-
-        // Preview bitti -> unmatched kartları kapat
         foreach (var card in boardBuilder.SpawnedCards)
         {
             if (card == null) continue;
             if (card.IsMatched) continue;
-
-            // matched değilse kapat
             yield return StartCoroutine(card.FlipTo(false));
         }
 
@@ -236,12 +231,12 @@ public class GameController : MonoBehaviour
         {
             Debug.Log("[GameController] GAME OVER (all matched)");
 
-            _save.isCompleted = true;     // ✅ completed işaretle
-            SaveSystem.Save(_save);       // ✅ kaydet
+            _save.isCompleted = true;     
+            SaveSystem.Save(_save);     
 
-            _inputLocked = true;          // ✅ input kapat (oyun bitti)
+            _inputLocked = true; 
 
-            if (gameSceneCanvas != null)  // ✅ panel aç
+            if (gameSceneCanvas != null) 
                 gameSceneCanvas.ShowGameOver();
         }
     }
@@ -256,7 +251,6 @@ public class GameController : MonoBehaviour
 
     private bool IsGameOver()
     {
-        // Artık objeler aktif kaldığı için IsMatched ile kontrol ediyoruz
         foreach (var c in boardBuilder.SpawnedCards)
         {
             if (c == null) continue;

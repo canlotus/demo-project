@@ -45,8 +45,6 @@ public class GameSceneCanvas : MonoBehaviour
         if (gameOverPanel != null)
             gameOverPanel.SetActive(true);
 
-        // Oyun bittiğinde geri butonunu da disable edebilirsin (opsiyonel)
-        // if (backButton != null) backButton.interactable = false;
     }
 
     private void OnBackClicked()

@@ -13,7 +13,7 @@ public class CardView : MonoBehaviour, IPointerClickHandler
     [SerializeField] private Graphic[] tintTargets;
 
     [Header("Optional (recommended)")]
-    [SerializeField] private CanvasGroup canvasGroup; // prefab root'a ekle
+    [SerializeField] private CanvasGroup canvasGroup;
 
     [Header("Flip")]
     [SerializeField] private float flipDuration = 0.14f;
@@ -40,8 +40,6 @@ public class CardView : MonoBehaviour, IPointerClickHandler
         {
             _baseColors = Array.Empty<Color>();
         }
-
-        // CanvasGroup yoksa sorun değil (sadece alpha animasyon olmaz)
     }
 
     public void Init(int cellIndex, int cardId, Sprite faceSprite)
@@ -53,7 +51,7 @@ public class CardView : MonoBehaviour, IPointerClickHandler
             frontImage.sprite = faceSprite;
 
         SetMatched(false);
-        SetFaceUp(true, instant: true); // preview için başlangıçta açık
+        SetFaceUp(true, instant: true); 
         ResetTint();
 
         // ensure visible
@@ -128,10 +126,6 @@ public class CardView : MonoBehaviour, IPointerClickHandler
         IsBusy = false;
     }
 
-    /// <summary>
-    /// Match olduğunda hücre sabit kalsın diye objeyi kapatmıyoruz.
-    /// Görsel+raycast kapanır => empty slot gibi durur.
-    /// </summary>
     public void MakeEmptyInstant()
     {
         IsMatched = true;
@@ -176,8 +170,6 @@ public class CardView : MonoBehaviour, IPointerClickHandler
 
             yield return null;
         }
-
-        // Layout bozulmasın diye scale'i geri alıyoruz (child hala yer kaplayacak)
         transform.localScale = fromScale;
 
         MakeEmptyInstant();
@@ -209,8 +201,6 @@ public class CardView : MonoBehaviour, IPointerClickHandler
     {
         if (IsMatched) return;
         if (IsBusy) return;
-
-        // CanvasGroup ile raycast kapandıysa zaten click gelmez ama garanti:
         if (canvasGroup != null && !canvasGroup.blocksRaycasts) return;
 
         Clicked?.Invoke(this);
