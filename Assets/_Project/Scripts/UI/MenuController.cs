@@ -74,8 +74,10 @@ public class MenuController : MonoBehaviour
             cols = entry.cols,
             emptyIndices = emptyArr,
             seed = seed,
-            score = 0,
-            matchedCardIds = Array.Empty<int>()
+            attempts = 0,
+            matches = 0,
+            previewDone = false,
+            matchedCellIndices = Array.Empty<int>(),
         };
         SaveSystem.Save(save);
         SceneManager.LoadScene(gameSceneName);

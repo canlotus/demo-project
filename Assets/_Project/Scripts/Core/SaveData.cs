@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveData
 {
-    public int version = 1;
+    public int version = 2;
 
     public DifficultyId difficulty;
     public int rows;
@@ -13,12 +13,15 @@ public class SaveData
     public int[] emptyIndices;
 
     public int seed;
-    public int score;
 
-    // ileride:
-    public int[] matchedCardIds;
+    public int attempts;
+    public int matches;
+
+    public bool previewDone;
+
+    // row-major cellIndex list
+    public int[] matchedCellIndices;
 }
-
 
 public static class SaveSystem
 {

@@ -22,6 +22,9 @@ public class DifficultyEntry
     public int PlayableCells => TotalCells - (emptyIndices?.Count ?? 0);
     [Header("Card Face Sprites")]
     public List<Sprite> faceSprites = new List<Sprite>();
+    [Min(0f)] public float previewSeconds = 3f;     
+    [Min(0f)] public float mismatchFlashSeconds = 1f;   
+    [Min(0f)] public float matchVanishSeconds = 0.18f; 
     public bool IsEmpty(int index)
     {
         if (emptyIndices == null) return false;

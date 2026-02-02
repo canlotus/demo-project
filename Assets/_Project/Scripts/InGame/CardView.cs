@@ -9,45 +9,70 @@ public class CardView : MonoBehaviour, IPointerClickHandler
     [Header("UI")]
     [SerializeField] private GameObject frontRoot;
     [SerializeField] private GameObject backRoot;
-
-    [Tooltip("Front yüzün Image component'i (sprite buraya atanacak)")]
     [SerializeField] private Image frontImage;
+    [SerializeField] private Graphic[] tintTargets;
+
+    [Header("Optional (recommended)")]
+    [SerializeField] private CanvasGroup canvasGroup; // prefab root'a ekle
 
     [Header("Flip")]
     [SerializeField] private float flipDuration = 0.14f;
 
+    public int CellIndex { get; private set; }
     public int CardId { get; private set; }
     public bool IsFaceUp { get; private set; }
     public bool IsMatched { get; private set; }
+    public bool IsBusy { get; private set; }
 
     public event Action<CardView> Clicked;
 
-    private bool _isFlipping;
+    private Color[] _baseColors;
 
-    // ✅ Yeni init: sprite atar
-    public void Init(int cardId, Sprite faceSprite)
+    private void Awake()
     {
+        if (tintTargets != null && tintTargets.Length > 0)
+        {
+            _baseColors = new Color[tintTargets.Length];
+            for (int i = 0; i < tintTargets.Length; i++)
+                _baseColors[i] = tintTargets[i] != null ? tintTargets[i].color : Color.white;
+        }
+        else
+        {
+            _baseColors = Array.Empty<Color>();
+        }
+
+        // CanvasGroup yoksa sorun değil (sadece alpha animasyon olmaz)
+    }
+
+    public void Init(int cellIndex, int cardId, Sprite faceSprite)
+    {
+        CellIndex = cellIndex;
         CardId = cardId;
 
         if (frontImage != null)
             frontImage.sprite = faceSprite;
 
         SetMatched(false);
-        SetFaceUp(false, instant: true);
-    }
+        SetFaceUp(true, instant: true); // preview için başlangıçta açık
+        ResetTint();
 
-    // (İstersen eski Init'i de bırakabilirsin)
-    public void Init(int cardId)
-    {
-        CardId = cardId;
-        SetMatched(false);
-        SetFaceUp(false, instant: true);
+        // ensure visible
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 1f;
+            canvasGroup.blocksRaycasts = true;
+            canvasGroup.interactable = true;
+        }
+
+        var btn = GetComponent<Button>();
+        if (btn != null) btn.interactable = true;
+
+        gameObject.SetActive(true);
     }
 
     public void SetMatched(bool matched)
     {
         IsMatched = matched;
-        if (matched) SetFaceUp(true, instant: true);
     }
 
     public void SetFaceUp(bool faceUp, bool instant)
@@ -65,25 +90,99 @@ public class CardView : MonoBehaviour, IPointerClickHandler
         }
     }
 
-    public void Flip()
+    public IEnumerator FlipTo(bool faceUp)
     {
-        if (_isFlipping) return;
-        StartCoroutine(FlipRoutine());
-    }
+        if (IsBusy) yield break;
+        if (IsFaceUp == faceUp) yield break;
 
-    private IEnumerator FlipRoutine()
-    {
-        _isFlipping = true;
+        IsBusy = true;
 
         float half = flipDuration * 0.5f;
 
         yield return ScaleX(1f, 0f, half);
-
-        SetFaceUp(!IsFaceUp, instant: true);
-
+        SetFaceUp(faceUp, instant: true);
         yield return ScaleX(0f, 1f, half);
 
-        _isFlipping = false;
+        IsBusy = false;
+    }
+
+    public IEnumerator FlashMismatch(float duration)
+    {
+        if (IsBusy) yield break;
+        IsBusy = true;
+
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / duration);
+
+            float pulse = 1f - Mathf.Abs(2f * k - 1f);
+            Color c = Color.Lerp(Color.white, new Color(1f, 0.35f, 0.35f, 1f), pulse);
+
+            ApplyTint(c);
+            yield return null;
+        }
+
+        ResetTint();
+        IsBusy = false;
+    }
+
+    /// <summary>
+    /// Match olduğunda hücre sabit kalsın diye objeyi kapatmıyoruz.
+    /// Görsel+raycast kapanır => empty slot gibi durur.
+    /// </summary>
+    public void MakeEmptyInstant()
+    {
+        IsMatched = true;
+
+        if (frontRoot != null) frontRoot.SetActive(false);
+        if (backRoot != null) backRoot.SetActive(false);
+
+        ResetTint();
+
+        var btn = GetComponent<Button>();
+        if (btn != null) btn.interactable = false;
+
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 0f;
+            canvasGroup.blocksRaycasts = false;
+            canvasGroup.interactable = false;
+        }
+    }
+
+    public IEnumerator VanishToEmpty(float duration)
+    {
+        if (IsBusy) yield break;
+        IsBusy = true;
+
+        float t = 0f;
+
+        Vector3 fromScale = transform.localScale;
+        Vector3 toScale = fromScale * 0.0f;
+
+        float fromAlpha = (canvasGroup != null) ? canvasGroup.alpha : 1f;
+
+        while (t < duration)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = duration <= 0f ? 1f : Mathf.Clamp01(t / duration);
+
+            transform.localScale = Vector3.Lerp(fromScale, toScale, k);
+
+            if (canvasGroup != null)
+                canvasGroup.alpha = Mathf.Lerp(fromAlpha, 0f, k);
+
+            yield return null;
+        }
+
+        // Layout bozulmasın diye scale'i geri alıyoruz (child hala yer kaplayacak)
+        transform.localScale = fromScale;
+
+        MakeEmptyInstant();
+
+        IsBusy = false;
     }
 
     private IEnumerator ScaleX(float from, float to, float dur)
@@ -93,6 +192,7 @@ public class CardView : MonoBehaviour, IPointerClickHandler
         {
             t += Time.unscaledDeltaTime;
             float k = dur <= 0f ? 1f : Mathf.Clamp01(t / dur);
+
             float x = Mathf.Lerp(from, to, k);
             var s = transform.localScale;
             s.x = x;
@@ -108,6 +208,25 @@ public class CardView : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         if (IsMatched) return;
+        if (IsBusy) return;
+
+        // CanvasGroup ile raycast kapandıysa zaten click gelmez ama garanti:
+        if (canvasGroup != null && !canvasGroup.blocksRaycasts) return;
+
         Clicked?.Invoke(this);
+    }
+
+    private void ApplyTint(Color c)
+    {
+        if (tintTargets == null) return;
+        for (int i = 0; i < tintTargets.Length; i++)
+            if (tintTargets[i] != null) tintTargets[i].color = c;
+    }
+
+    private void ResetTint()
+    {
+        if (tintTargets == null || _baseColors == null) return;
+        for (int i = 0; i < tintTargets.Length; i++)
+            if (tintTargets[i] != null) tintTargets[i].color = _baseColors[i];
     }
 }

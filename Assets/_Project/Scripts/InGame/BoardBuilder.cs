@@ -6,8 +6,8 @@ using UnityEngine.UI;
 public class BoardBuilder : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private RectTransform boardContainer;   // BoardArea
-    [SerializeField] private GridLayoutGroup grid;           // BoardGrid
+    [SerializeField] private RectTransform boardContainer;
+    [SerializeField] private GridLayoutGroup grid;
 
     [Header("Prefabs")]
     [SerializeField] private CardView cardPrefab;
@@ -18,27 +18,27 @@ public class BoardBuilder : MonoBehaviour
     [SerializeField] private Vector2 padding = new Vector2(24f, 24f);
 
     public IReadOnlyList<CardView> SpawnedCards => _cards;
-    private readonly List<CardView> _cards = new List<CardView>();
 
-    /// <summary>
-    /// Builds the board with masking (empty cells) and assigns face sprites by cardId.
-    /// cardId range: 0..(pairCount-1). Two cards share same id => same sprite.
-    /// </summary>
+    private readonly List<CardView> _cards = new List<CardView>();
+    private readonly Dictionary<int, CardView> _byCellIndex = new Dictionary<int, CardView>();
+
+    public bool TryGetCardByCellIndex(int cellIndex, out CardView card)
+        => _byCellIndex.TryGetValue(cellIndex, out card);
+
     public void Build(BoardLayoutData layout, int seed, IReadOnlyList<Sprite> faceSprites)
     {
         if (boardContainer == null || grid == null || cardPrefab == null || emptyCellPrefab == null)
         {
-            Debug.LogError("[BoardBuilder] Missing references! Check boardContainer, grid, cardPrefab, emptyCellPrefab.");
+            Debug.LogError("[BoardBuilder] Missing references!");
             return;
         }
 
         if (layout.rows <= 0 || layout.cols <= 0)
         {
-            Debug.LogError($"[BoardBuilder] Invalid layout rows/cols: {layout.rows}x{layout.cols}");
+            Debug.LogError($"[BoardBuilder] Invalid layout: {layout.rows}x{layout.cols}");
             return;
         }
 
-        // playable cell count must be even for pairs
         if (layout.PlayableCells <= 0 || layout.PlayableCells % 2 != 0)
         {
             Debug.LogError($"[BoardBuilder] PlayableCells must be positive and even! playable={layout.PlayableCells}");
@@ -47,25 +47,20 @@ public class BoardBuilder : MonoBehaviour
 
         int pairCount = layout.PlayableCells / 2;
 
-        if (faceSprites == null)
+        if (faceSprites == null || faceSprites.Count < pairCount)
         {
-            Debug.LogError("[BoardBuilder] faceSprites is null. Assign sprites in Difficulty Scriptable.");
-            return;
-        }
-
-        if (faceSprites.Count < pairCount)
-        {
-            Debug.LogError($"[BoardBuilder] Not enough faceSprites! Need {pairCount} unique sprites but have {faceSprites.Count}. " +
-                           $"(Board playable={layout.PlayableCells} => pairs={pairCount})");
+            Debug.LogError($"[BoardBuilder] Not enough faceSprites. Need={pairCount}, Have={(faceSprites == null ? 0 : faceSprites.Count)}");
             return;
         }
 
         ClearChildren();
         _cards.Clear();
+        _byCellIndex.Clear();
 
-        // Grid config
+        // grid config
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = layout.cols;
+
         grid.spacing = spacing;
 
         grid.padding = new RectOffset(
@@ -75,18 +70,15 @@ public class BoardBuilder : MonoBehaviour
             bottom: Mathf.RoundToInt(padding.y)
         );
 
-        // Cell size (fit boardContainer)
         ApplyAutoCellSize(layout.rows, layout.cols);
 
-        // Create deck (pair ids), shuffled by seed
+        // deck (pair ids)
         var deck = CreateShuffledDeck(layout.PlayableCells, seed);
-
         int deckIndex = 0;
 
-        // Build cells in row-major order
-        for (int i = 0; i < layout.TotalCells; i++)
+        for (int cellIndex = 0; cellIndex < layout.TotalCells; cellIndex++)
         {
-            if (IsEmpty(layout, i))
+            if (IsEmpty(layout, cellIndex))
             {
                 Instantiate(emptyCellPrefab, grid.transform);
             }
@@ -96,14 +88,21 @@ public class BoardBuilder : MonoBehaviour
                 Sprite face = faceSprites[cardId];
 
                 var card = Instantiate(cardPrefab, grid.transform);
-                card.Init(cardId, face);
+                card.Init(cellIndex, cardId, face);
+
                 _cards.Add(card);
+                _byCellIndex[cellIndex] = card;
             }
         }
+    }
 
-        if (deckIndex != layout.PlayableCells)
+    public void ForceAllUnmatchedFaceDownInstant()
+    {
+        for (int i = 0; i < _cards.Count; i++)
         {
-            Debug.LogWarning($"[BoardBuilder] DeckIndex mismatch: used={deckIndex}, playable={layout.PlayableCells}. Check empty indices.");
+            var c = _cards[i];
+            if (c != null && !c.IsMatched)
+                c.SetFaceUp(false, instant: true);
         }
     }
 
@@ -123,8 +122,8 @@ public class BoardBuilder : MonoBehaviour
         float cellW = availW / cols;
         float cellH = availH / rows;
 
-        float cell = Mathf.Floor(Mathf.Min(cellW, cellH)); // square
-        cell = Mathf.Max(8f, cell); // safety
+        float cell = Mathf.Floor(Mathf.Min(cellW, cellH));
+        cell = Mathf.Max(8f, cell);
 
         grid.cellSize = new Vector2(cell, cell);
     }
@@ -135,9 +134,8 @@ public class BoardBuilder : MonoBehaviour
         if (empties == null || empties.Length == 0) return false;
 
         for (int i = 0; i < empties.Length; i++)
-        {
             if (empties[i] == index) return true;
-        }
+
         return false;
     }
 
@@ -165,8 +163,6 @@ public class BoardBuilder : MonoBehaviour
     private void ClearChildren()
     {
         for (int i = grid.transform.childCount - 1; i >= 0; i--)
-        {
             Destroy(grid.transform.GetChild(i).gameObject);
-        }
     }
 }
