@@ -20,7 +20,8 @@ public class DifficultyEntry
     public List<int> emptyIndices = new List<int>();
     public int TotalCells => rows * cols;
     public int PlayableCells => TotalCells - (emptyIndices?.Count ?? 0);
-
+    [Header("Card Face Sprites")]
+    public List<Sprite> faceSprites = new List<Sprite>();
     public bool IsEmpty(int index)
     {
         if (emptyIndices == null) return false;
