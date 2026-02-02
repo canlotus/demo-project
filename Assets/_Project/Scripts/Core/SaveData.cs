@@ -7,16 +7,18 @@ public class SaveData
 {
     public int version = 1;
 
-    public Difficulty difficulty;
+    public DifficultyId difficulty;
     public int rows;
     public int cols;
-    public int seed;
+    public int[] emptyIndices;
 
+    public int seed;
     public int score;
 
-    // ileride eşleşen kartları tutmak için (şimdilik boş kalabilir)
+    // ileride:
     public int[] matchedCardIds;
 }
+
 
 public static class SaveSystem
 {

@@ -1,12 +1,5 @@
 using System;
-using UnityEngine;
-
-public enum Difficulty
-{
-    Easy = 0,
-    Medium = 1,
-    Hard = 2
-}
+using System.Collections.Generic;
 
 public enum StartMode
 {
@@ -15,30 +8,36 @@ public enum StartMode
 }
 
 [Serializable]
-public struct BoardConfig
+public struct BoardLayoutData
 {
     public int rows;
     public int cols;
+    public int[] emptyIndices;
 
-    public BoardConfig(int rows, int cols)
+    public BoardLayoutData(int rows, int cols, int[] emptyIndices)
     {
         this.rows = rows;
         this.cols = cols;
+        this.emptyIndices = emptyIndices;
     }
+
+    public int TotalCells => rows * cols;
+    public int EmptyCount => emptyIndices == null ? 0 : emptyIndices.Length;
+    public int PlayableCells => TotalCells - EmptyCount;
 }
 
 public static class GameSession
 {
     public static StartMode StartMode { get; private set; } = StartMode.NewGame;
-    public static Difficulty Difficulty { get; private set; } = Difficulty.Easy;
-    public static BoardConfig BoardConfig { get; private set; } = new BoardConfig(2, 2);
+    public static DifficultyId Difficulty { get; private set; } = DifficultyId.Easy;
+    public static BoardLayoutData Layout { get; private set; } = new BoardLayoutData(2, 2, Array.Empty<int>());
     public static int Seed { get; private set; } = 0;
 
-    public static void SetNewGame(Difficulty difficulty, BoardConfig config, int seed)
+    public static void SetNewGame(DifficultyId difficulty, BoardLayoutData layout, int seed)
     {
         StartMode = StartMode.NewGame;
         Difficulty = difficulty;
-        BoardConfig = config;
+        Layout = layout;
         Seed = seed;
     }
 

@@ -151,19 +151,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ed10734cc0a54d86a4bd7f5b44db75b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  difficultyDb: {fileID: 11400000, guid: d7eae889058b047bba4d3a4d7ae3c6d4, type: 2}
   difficultyDropdown: {fileID: 444402051}
   newGameButton: {fileID: 1255267405}
   continueButton: {fileID: 179289258}
   gameSceneName: GameScene
-  easyConfig:
-    rows: 2
-    cols: 2
-  mediumConfig:
-    rows: 4
-    cols: 4
-  hardConfig:
-    rows: 5
-    cols: 6
 --- !u!4 &146752823
 Transform:
   m_ObjectHideFlags: 0
@@ -733,11 +725,11 @@ MonoBehaviour:
   m_Value: 0
   m_Options:
     m_Options:
-    - m_Text: Option A
+    - m_Text: Easy
       m_Image: {fileID: 0}
-    - m_Text: Option B
+    - m_Text: Medium
       m_Image: {fileID: 0}
-    - m_Text: Option C
+    - m_Text: Hard
       m_Image: {fileID: 0}
   m_OnValueChanged:
     m_PersistentCalls:
@@ -1384,7 +1376,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Option A
+  m_text: Easy
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
