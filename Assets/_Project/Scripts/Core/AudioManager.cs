@@ -9,6 +9,7 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip sfxMismatch;
     [SerializeField] private AudioClip sfxWin;
     [SerializeField] private AudioClip sfxButton;
+    [SerializeField] private AudioClip sfxFlip;
 
     [Header("Settings")]
     [Range(0f, 1f)][SerializeField] private float volume = 1f;
@@ -35,7 +36,7 @@ public class AudioManager : MonoBehaviour
     public void PlayMismatch()=> Play(sfxMismatch);
     public void PlayWin()     => Play(sfxWin);
     public void PlayButton()  => Play(sfxButton);
-
+    public void PlayFlip() => Play(sfxFlip);
     public void Play(AudioClip clip)
     {
         if (clip == null) return;

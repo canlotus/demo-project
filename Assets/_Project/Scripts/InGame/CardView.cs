@@ -94,7 +94,7 @@ public class CardView : MonoBehaviour, IPointerClickHandler
         if (IsFaceUp == faceUp) yield break;
 
         IsBusy = true;
-
+        if (AudioManager.I != null) AudioManager.I.PlayFlip();
         float half = flipDuration * 0.5f;
 
         yield return ScaleX(1f, 0f, half);

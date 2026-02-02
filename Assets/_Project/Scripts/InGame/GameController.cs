@@ -17,16 +17,27 @@ public class GameController : MonoBehaviour
     [SerializeField] private TMP_Text matchCountText;
     [SerializeField] private TMP_Text attemptCountText;
 
+    [Header("Continuous Flip Settings")]
+    [SerializeField] private int maxFaceUpUnresolvedCards = 4; 
+
     private DifficultyEntry _entry;
     private SaveData _save;
 
-    private bool _inputLocked;
     private bool _previewRunning;
 
-    private CardView _first;
-    private CardView _second;
-
     private readonly HashSet<int> _matchedCellSet = new HashSet<int>();
+
+    private readonly List<CardView> _open = new List<CardView>(2);
+
+    private readonly Queue<Pair> _pendingPairs = new Queue<Pair>();
+    private bool _resolverRunning;
+
+    private struct Pair
+    {
+        public CardView a;
+        public CardView b;
+        public Pair(CardView a, CardView b) { this.a = a; this.b = b; }
+    }
 
     private void Start()
     {
@@ -64,12 +75,6 @@ public class GameController : MonoBehaviour
             if (_save.matchedCellIndices != null)
                 for (int i = 0; i < _save.matchedCellIndices.Length; i++)
                     _matchedCellSet.Add(_save.matchedCellIndices[i]);
-
-            if (_save.isCompleted)
-            {
-                _inputLocked = true;
-                if (gameSceneCanvas != null) gameSceneCanvas.ShowGameOver();
-            }
         }
         else
         {
@@ -111,10 +116,10 @@ public class GameController : MonoBehaviour
 
         RefreshUI();
 
-        // Eğer zaten completed ise preview/tıklama akışına girme
         if (_save.isCompleted)
         {
             boardBuilder.ForceAllUnmatchedFaceDownInstant();
+            if (gameSceneCanvas != null) gameSceneCanvas.ShowGameOver();
             return;
         }
 
@@ -147,7 +152,6 @@ public class GameController : MonoBehaviour
     private IEnumerator PreviewRoutine(float seconds)
     {
         _previewRunning = true;
-        _inputLocked = true;
 
         yield return new WaitForSecondsRealtime(seconds);
 
@@ -161,106 +165,132 @@ public class GameController : MonoBehaviour
         _save.previewDone = true;
         SaveSystem.Save(_save);
 
-        _inputLocked = false;
         _previewRunning = false;
     }
 
     private void OnCardClicked(CardView card)
     {
         if (card == null) return;
-        if (_save != null && _save.isCompleted) return;
+        if (_save == null) return;
 
+        if (_save.isCompleted) return;
         if (_previewRunning) return;
-        if (_inputLocked) return;
+
         if (card.IsMatched) return;
-
-        if (_first == card) return;
-
-        StartCoroutine(HandleClickRoutine(card));
-    }
-
-    private IEnumerator HandleClickRoutine(CardView card)
-    {
-        if (card.IsFaceUp) yield break;
-
-        if (_first == null)
+        if (card.IsBusy) return;
+        if (card.IsFaceUp) return; 
+        if (CountFaceUpUnresolved() >= maxFaceUpUnresolvedCards)
         {
-            yield return StartCoroutine(card.FlipTo(true));
-            _first = card;
-            yield break;
+            return;
         }
 
-        if (_second == null)
+        StartCoroutine(FlipAndSelectRoutine(card));
+    }
+
+    private IEnumerator FlipAndSelectRoutine(CardView card)
+    {
+        yield return StartCoroutine(card.FlipTo(true));
+        if (card == null) yield break;
+        if (card.IsMatched) yield break;
+
+        _open.Add(card);
+
+        if (_open.Count >= 2)
         {
-            _inputLocked = true;
+            var a = _open[0];
+            var b = _open[1];
 
-            yield return StartCoroutine(card.FlipTo(true));
-            _second = card;
+            _open.Clear();
+            if (a == null || b == null || a == b)
+                yield break;
 
+            _pendingPairs.Enqueue(new Pair(a, b));
             _save.attempts++;
             RefreshUI();
             SaveSystem.Save(_save);
-
-            yield return StartCoroutine(ResolvePairRoutine());
-            if (_save != null && _save.isCompleted)
-                yield break;
-
-            _inputLocked = false;
+            if (!_resolverRunning)
+                StartCoroutine(ResolvePendingPairsRoutine());
         }
     }
 
-    private IEnumerator ResolvePairRoutine()
+    private int CountFaceUpUnresolved()
     {
-        if (_first == null || _second == null) yield break;
-
-        bool isMatch = _first.CardId == _second.CardId;
-
-        if (isMatch)
+        int count = 0;
+        foreach (var c in boardBuilder.SpawnedCards)
         {
-            if (AudioManager.I != null) AudioManager.I.PlayMatch();
-
-            _save.matches++;
-
-            _matchedCellSet.Add(_first.CellIndex);
-            _matchedCellSet.Add(_second.CellIndex);
-            _save.matchedCellIndices = ToArray(_matchedCellSet);
-
-            RefreshUI();
-            SaveSystem.Save(_save);
-
-            float vanishDur = Mathf.Max(0f, _entry.matchVanishSeconds);
-
-            yield return StartCoroutine(_first.VanishToEmpty(vanishDur));
-            yield return StartCoroutine(_second.VanishToEmpty(vanishDur));
-        }
-        else
-        {
-            if (AudioManager.I != null) AudioManager.I.PlayMismatch();
-
-            float flash = Mathf.Max(0f, _entry.mismatchFlashSeconds);
-
-            yield return StartCoroutine(FlashBoth(_first, _second, flash));
-
-            yield return StartCoroutine(_first.FlipTo(false));
-            yield return StartCoroutine(_second.FlipTo(false));
+            if (c == null) continue;
+            if (c.IsMatched) continue;
+            if (c.IsFaceUp) count++;
         }
 
-        _first = null;
-        _second = null;
+        return count;
+    }
 
-        if (IsGameOver())
+    private IEnumerator ResolvePendingPairsRoutine()
+    {
+        _resolverRunning = true;
+
+        while (_pendingPairs.Count > 0)
         {
-            Debug.Log("[GameController] GAME OVER (all matched)");
-            if (AudioManager.I != null) AudioManager.I.PlayWin();
+            if (_save == null || _save.isCompleted) break;
 
-            _save.isCompleted = true;
-            SaveSystem.Save(_save);
+            var pair = _pendingPairs.Dequeue();
+            var a = pair.a;
+            var b = pair.b;
+            if (a == null || b == null) continue;
+            if (a.IsMatched || b.IsMatched) continue;
+            if (!a.IsFaceUp) yield return StartCoroutine(a.FlipTo(true));
+            if (!b.IsFaceUp) yield return StartCoroutine(b.FlipTo(true));
 
-            _inputLocked = true;
+            bool isMatch = a.CardId == b.CardId;
 
-            if (gameSceneCanvas != null)
-                gameSceneCanvas.ShowGameOver();
+            if (isMatch)
+            {
+                if (AudioManager.I != null) AudioManager.I.PlayMatch();
+
+                _save.matches++;
+
+                _matchedCellSet.Add(a.CellIndex);
+                _matchedCellSet.Add(b.CellIndex);
+                _save.matchedCellIndices = ToArray(_matchedCellSet);
+
+                RefreshUI();
+                SaveSystem.Save(_save);
+
+                float vanishDur = Mathf.Max(0f, _entry.matchVanishSeconds);
+
+                yield return StartCoroutine(a.VanishToEmpty(vanishDur));
+                yield return StartCoroutine(b.VanishToEmpty(vanishDur));
+            }
+            else
+            {
+                if (AudioManager.I != null) AudioManager.I.PlayMismatch();
+
+                float flash = Mathf.Max(0f, _entry.mismatchFlashSeconds);
+
+                yield return StartCoroutine(FlashBoth(a, b, flash));
+
+                yield return StartCoroutine(a.FlipTo(false));
+                yield return StartCoroutine(b.FlipTo(false));
+            }
+
+            if (IsGameOver())
+            {
+                Debug.Log("[GameController] GAME OVER (all matched)");
+                if (AudioManager.I != null) AudioManager.I.PlayWin();
+                _save.isCompleted = true;
+                SaveSystem.Save(_save);
+                _open.Clear();
+                _pendingPairs.Clear();
+
+                if (gameSceneCanvas != null)
+                    gameSceneCanvas.ShowGameOver();
+
+                break;
+            }
         }
+
+        _resolverRunning = false;
     }
 
     private IEnumerator FlashBoth(CardView a, CardView b, float duration)

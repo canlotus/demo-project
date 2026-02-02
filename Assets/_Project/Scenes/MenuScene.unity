@@ -2236,6 +2236,7 @@ MonoBehaviour:
   sfxMismatch: {fileID: 8300000, guid: 9d68d4958d0bf4379b23dd1c053d66d8, type: 3}
   sfxWin: {fileID: 8300000, guid: ca36d8dfae02d4347a4b1ee7f427228e, type: 3}
   sfxButton: {fileID: 8300000, guid: e9bba8176ca254cc495110b58121eb3a, type: 3}
+  sfxFlip: {fileID: 8300000, guid: f58793112c4634ccabc61a198366c5f8, type: 3}
   volume: 1
 --- !u!4 &1567412445
 Transform:
